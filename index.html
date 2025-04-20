@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EMI Calculator</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      transition: background-color 0.3s, color 0.3s;
+    }
+    :root {
+      --bg-color: #ffffff;
+      --text-color: #000000;
+    }
+    .dark-mode {
+      --bg-color: #121212;
+      --text-color: #ffffff;
+    }
+    .container {
+      max-width: 600px;
+      margin: auto;
+    }
+    label, input, select {
+      display: block;
+      margin: 10px 0;
+      width: 100%;
+    }
+    button {
+      padding: 10px;
+      margin: 10px 5px 0 0;
+      cursor: pointer;
+    }
+    .output {
+      margin-top: 20px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+    }
+    .chart-container {
+      max-width: 400px;
+      margin: 20px auto;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>EMI Calculator</h1>
+  <label>Loan Amount (₹): <input type="number" id="loanAmount" min="1"></label>
+  <label>Annual Interest Rate (%): <input type="number" id="interestRate" step="0.01" min="0.01"></label>
+  <label>Loan Tenure: <input type="number" id="loanTenure" min="1"></label>
+  <label>Tenure Type:
+    <select id="tenureType">
+      <option value="years">Years</option>
+      <option value="months">Months</option>
+    </select>
+  </label>
+  <button onclick="calculateEMI()">Calculate EMI</button>
+  <button onclick="resetForm()">Reset</button>
+  <button onclick="toggleDarkMode()">Toggle Light/Dark</button>
+
+  <div class="output" id="results"></div>
+  <div class="chart-container">
+    <canvas id="emiChart"></canvas>
+  </div>
+  <div id="schedule"></div>
+</div>
+
+<script>
+function validateInputs(amount, rate, tenure) {
+  return amount > 0 && rate > 0 && tenure > 0;
+}
+
+function calculateEMI() {
+  const amount = parseFloat(document.getElementById('loanAmount').value);
+  const annualRate = parseFloat(document.getElementById('interestRate').value);
+  const tenureInput = parseInt(document.getElementById('loanTenure').value);
+  const tenureType = document.getElementById('tenureType').value;
+
+  if (!validateInputs(amount, annualRate, tenureInput)) {
+    alert("Please enter valid, non-zero numeric values.");
+    return;
+  }
+
+  const months = tenureType === 'years' ? tenureInput * 12 : tenureInput;
+  const monthlyRate = annualRate / 12 / 100;
+
+  const emi = (amount * monthlyRate * Math.pow(1 + monthlyRate, months)) /
+              (Math.pow(1 + monthlyRate, months) - 1);
+  const totalPayment = emi * months;
+  const totalInterest = totalPayment - amount;
+
+  document.getElementById('results').innerHTML = `
+    <h2>Results:</h2>
+    <p>Monthly EMI: ₹${emi.toFixed(2)}</p>
+    <p>Total Interest: ₹${totalInterest.toFixed(2)}</p>
+    <p>Total Payment: ₹${totalPayment.toFixed(2)}</p>
+  `;
+
+  renderChart(amount, totalInterest);
+  renderSchedule(emi, amount, monthlyRate, months);
+}
+
+function renderChart(principal, interest) {
+  const ctx = document.getElementById('emiChart').getContext('2d');
+  if (window.emiPie) window.emiPie.destroy();
+  window.emiPie = new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels: ['Principal', 'Interest'],
+      datasets: [{
+        data: [principal, interest],
+        backgroundColor: ['#4caf50', '#f44336']
+      }]
+    }
+  });
+}
+
+function renderSchedule(emi, principal, monthlyRate, months) {
+  let balance = principal;
+  let scheduleHTML = '<h3>Payment Schedule</h3><table><tr><th>Month</th><th>Principal</th><th>Interest</th><th>Balance</th></tr>';
+  for (let i = 1; i <= months; i++) {
+    const interest = balance * monthlyRate;
+    const principalPart = emi - interest;
+    balance -= principalPart;
+    scheduleHTML += `<tr><td>${i}</td><td>₹${principalPart.toFixed(2)}</td><td>₹${interest.toFixed(2)}</td><td>₹${balance > 0 ? balance.toFixed(2) : 0}</td></tr>`;
+  }
+  scheduleHTML += '</table>';
+  document.getElementById('schedule').innerHTML = scheduleHTML;
+}
+
+function resetForm() {
+  document.getElementById('loanAmount').value = '';
+  document.getElementById('interestRate').value = '';
+  document.getElementById('loanTenure').value = '';
+  document.getElementById('tenureType').value = 'years';
+  document.getElementById('results').innerHTML = '';
+  document.getElementById('schedule').innerHTML = '';
+  if (window.emiPie) window.emiPie.destroy();
+}
+
+function toggleDarkMode() {
+  document.body.classList.toggle('dark-mode');
+}
+</script>
+</body>
+</html>
