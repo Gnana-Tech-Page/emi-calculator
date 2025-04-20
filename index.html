@@ -2,15 +2,16 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>EMI Calculator</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     :root {
       --bg-color: #ffffff;
       --text-color: #000000;
       --card-bg: #f5f5f5;
-      --primary-color: #4caf50;
+      --primary-color: #90caf9;
       --danger-color: #f44336;
     }
     .dark-mode {
@@ -20,186 +21,278 @@
     }
     body {
       font-family: 'Segoe UI', sans-serif;
-      margin: 0;
-      padding: 0;
       background-color: var(--bg-color);
       color: var(--text-color);
-      transition: background-color 0.3s, color 0.3s;
+      margin: 0;
+      padding: 0;
       display: flex;
-      align-items: center;
       justify-content: center;
-      height: 100vh;
+      min-height: 100vh;
+      transition: background-color 0.3s, color 0.3s;
     }
     .container {
       background-color: var(--card-bg);
       border-radius: 12px;
-      padding: 30px;
-      max-width: 600px;
+      padding: 2rem;
+      max-width: 900px;
       width: 100%;
       box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+      margin: 40px 20px;
     }
     h1, h2, h3 {
       text-align: center;
     }
-    label, input, select {
+    label {
+      margin: 12px 0 4px;
       display: block;
-      margin: 10px 0;
-      width: 100%;
+      font-weight: 600;
     }
     input, select {
-      padding: 8px;
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 12px;
       border-radius: 6px;
       border: 1px solid #ccc;
+      box-sizing: border-box;
+      font-size: 1rem;
     }
     button {
       padding: 10px 20px;
-      margin: 10px 5px 0 0;
+      margin: 8px 5px 0 0;
       cursor: pointer;
       border: none;
       border-radius: 6px;
       background-color: var(--primary-color);
       color: white;
       font-weight: bold;
+      transition: background-color 0.3s;
     }
     button:hover {
-      opacity: 0.9;
+      background-color: #64b5f6;
     }
     .output {
-      margin-top: 20px;
+      margin-top: 1.5rem;
+    }
+    .chart-container {
+      max-width: 400px;
+      margin: 20px auto;
     }
     table {
       width: 100%;
       border-collapse: collapse;
       margin-top: 20px;
+      font-size: 0.95rem;
     }
     th, td {
       border: 1px solid #ccc;
-      padding: 8px;
+      padding: 10px;
       text-align: center;
     }
-    .chart-container {
-      max-width: 400px;
-      margin: 20px auto;
+    th {
+      background-color: var(--primary-color);
+      color: white;
+    }
+    #amountInWords {
+      font-style: italic;
+      margin-bottom: 12px;
+      color: #555;
     }
   </style>
 </head>
 <body>
 <div class="container">
   <h1>EMI Calculator</h1>
-  <label>Loan Amount (₹): <input type="number" id="loanAmount" min="1"></label>
-  <label>Annual Interest Rate (%): <input type="number" id="interestRate" step="0.01" min="0.01"></label>
-  <label>Loan Tenure: <input type="number" id="loanTenure" min="1"></label>
-  <label>Tenure Type:
-    <select id="tenureType">
-      <option value="years">Years</option>
-      <option value="months">Months</option>
-    </select>
-  </label>
-  <label>Start Month:
-    <input type="month" id="startMonth">
-  </label>
-  <button onclick="calculateEMI()">Calculate EMI</button>
-  <button onclick="resetForm()">Reset</button>
-  <button onclick="toggleDarkMode()">Toggle Light/Dark</button>
+
+  <label for="loanAmount">Loan Amount (₹)</label>
+  <input type="number" id="loanAmount" min="1" />
+  <div id="amountInWords"></div>
+
+  <label for="interestRate">Annual Interest Rate (%)</label>
+  <input type="number" id="interestRate" step="0.01" min="0.01" />
+
+  <label for="loanTenure">Loan Tenure</label>
+  <input type="number" id="loanTenure" min="1" />
+
+  <label for="tenureType">Tenure Type</label>
+  <select id="tenureType">
+    <option value="years">Years</option>
+    <option value="months">Months</option>
+  </select>
+
+  <label for="startMonth">Start Month</label>
+  <input type="month" id="startMonth" />
+
+  <div>
+    <button onclick="calculateEMI()">Calculate EMI</button>
+    <button onclick="resetForm()">Reset</button>
+    <button onclick="toggleDarkMode()">Toggle Light/Dark</button>
+    <button onclick="exportCSV()">Export CSV</button>
+    <button onclick="exportPDF()">Export PDF</button>
+  </div>
 
   <div class="output" id="results"></div>
-  <div class="chart-container">
-    <canvas id="emiChart"></canvas>
-  </div>
+  <div class="chart-container"><canvas id="emiChart"></canvas></div>
   <div id="schedule"></div>
 </div>
 
 <script>
-function validateInputs(amount, rate, tenure) {
-  return amount > 0 && rate > 0 && tenure > 0;
-}
-
-function calculateEMI() {
-  const amount = parseFloat(document.getElementById('loanAmount').value);
-  const annualRate = parseFloat(document.getElementById('interestRate').value);
-  const tenureInput = parseInt(document.getElementById('loanTenure').value);
-  const tenureType = document.getElementById('tenureType').value;
-  const startMonthInput = document.getElementById('startMonth').value;
-
-  if (!validateInputs(amount, annualRate, tenureInput)) {
-    alert("Please enter valid, non-zero numeric values.");
-    return;
-  }
-
-  const months = tenureType === 'years' ? tenureInput * 12 : tenureInput;
-  const monthlyRate = annualRate / 12 / 100;
-
-  const emi = (amount * monthlyRate * Math.pow(1 + monthlyRate, months)) /
-              (Math.pow(1 + monthlyRate, months) - 1);
-  const totalPayment = emi * months;
-  const totalInterest = totalPayment - amount;
-
-  document.getElementById('results').innerHTML = `
-    <h2>Results:</h2>
-    <p>Monthly EMI: ₹${emi.toFixed(2)}</p>
-    <p>Total Principal Paid: ₹${amount.toFixed(2)}</p>
-    <p>Total Interest Paid: ₹${totalInterest.toFixed(2)}</p>
-    <p>Total Payment: ₹${totalPayment.toFixed(2)}</p>
-  `;
-
-  renderChart(amount, totalInterest);
-  renderSchedule(emi, amount, monthlyRate, months, startMonthInput);
-}
-
-function renderChart(principal, interest) {
-  const ctx = document.getElementById('emiChart').getContext('2d');
-  if (window.emiPie) window.emiPie.destroy();
-  window.emiPie = new Chart(ctx, {
-    type: 'pie',
-    data: {
-      labels: ['Principal', 'Interest'],
-      datasets: [{
-        data: [principal, interest],
-        backgroundColor: ['#4caf50', '#f44336']
-      }]
-    }
+  document.getElementById('loanAmount').addEventListener('input', function () {
+    const num = parseInt(this.value);
+    const words = numberToWords(num);
+    document.getElementById('amountInWords').innerText = isNaN(num) ? '' : `In words: ${words}`;
   });
-}
 
-function renderSchedule(emi, principal, monthlyRate, months, startMonthInput) {
-  let balance = principal;
-  let scheduleHTML = '<h3>Payment Schedule</h3><table><tr><th>Month</th><th>Principal</th><th>Interest</th><th>Balance</th></tr>';
-
-  let startDate = startMonthInput ? new Date(startMonthInput + '-01') : new Date();
-
-  for (let i = 1; i <= months; i++) {
-    const interest = balance * monthlyRate;
-    const principalPart = emi - interest;
-    balance -= principalPart;
-    const monthLabel = startDate.toLocaleString('default', { month: 'short', year: 'numeric' });
-    scheduleHTML += `<tr><td>${monthLabel}</td><td>₹${principalPart.toFixed(2)}</td><td>₹${interest.toFixed(2)}</td><td>₹${balance > 0 ? balance.toFixed(2) : 0}</td></tr>`;
-    startDate.setMonth(startDate.getMonth() + 1);
+  function formatINR(number) {
+    return number.toLocaleString('en-IN', { style: 'currency', currency: 'INR' });
   }
-  scheduleHTML += '</table>';
-  document.getElementById('schedule').innerHTML = scheduleHTML;
-}
 
-function resetForm() {
-  document.getElementById('loanAmount').value = '';
-  document.getElementById('interestRate').value = '';
-  document.getElementById('loanTenure').value = '';
-  document.getElementById('tenureType').value = 'years';
-  document.getElementById('startMonth').value = '';
-  document.getElementById('results').innerHTML = '';
-  document.getElementById('schedule').innerHTML = '';
-  if (window.emiPie) window.emiPie.destroy();
-}
+  function validateInputs(amount, rate, tenure) {
+    return amount > 0 && rate > 0 && tenure > 0;
+  }
 
-function toggleDarkMode() {
-  document.body.classList.toggle('dark-mode');
-}
+  function calculateEMI() {
+    const amount = parseFloat(document.getElementById('loanAmount').value);
+    const annualRate = parseFloat(document.getElementById('interestRate').value);
+    const tenureInput = parseInt(document.getElementById('loanTenure').value);
+    const tenureType = document.getElementById('tenureType').value;
+    const startMonthInput = document.getElementById('startMonth').value;
 
-window.onload = function() {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = (today.getMonth() + 1).toString().padStart(2, '0');
-  document.getElementById('startMonth').value = `${year}-${month}`;
-}
+    if (!validateInputs(amount, annualRate, tenureInput)) {
+      alert("Please enter valid, non-zero numeric values.");
+      return;
+    }
+
+    const months = tenureType === 'years' ? tenureInput * 12 : tenureInput;
+    const monthlyRate = annualRate / 12 / 100;
+
+    const emi = (amount * monthlyRate * Math.pow(1 + monthlyRate, months)) /
+      (Math.pow(1 + monthlyRate, months) - 1);
+    const totalPayment = emi * months;
+    const totalInterest = totalPayment - amount;
+
+    document.getElementById('results').innerHTML = `
+      <h2>Results</h2>
+      <p><strong>Monthly EMI:</strong> ${formatINR(emi)}</p>
+      <p><strong>Total Principal Paid:</strong> ${formatINR(amount)}</p>
+      <p><strong>Total Interest Paid:</strong> ${formatINR(totalInterest)}</p>
+      <p><strong>Total Payment:</strong> ${formatINR(totalPayment)}</p>
+    `;
+
+    renderChart(amount, totalInterest);
+    renderSchedule(emi, amount, monthlyRate, months, startMonthInput);
+  }
+
+  function renderChart(principal, interest) {
+    const ctx = document.getElementById('emiChart').getContext('2d');
+    if (window.emiPie) window.emiPie.destroy();
+    window.emiPie = new Chart(ctx, {
+      type: 'pie',
+      data: {
+        labels: ['Principal', 'Interest'],
+        datasets: [{
+          data: [principal, interest],
+          backgroundColor: ['#81d4fa', '#ffab91']
+        }]
+      },
+      options: {
+        plugins: {
+          legend: { position: 'bottom' }
+        }
+      }
+    });
+  }
+
+  function renderSchedule(emi, principal, monthlyRate, months, startMonthInput) {
+    let balance = principal;
+    let scheduleHTML = '<h3>Payment Schedule</h3><table><tr><th>Month</th><th>Principal</th><th>Interest</th><th>Balance</th></tr>';
+
+    let startDate = startMonthInput ? new Date(startMonthInput + '-01') : new Date();
+
+    for (let i = 1; i <= months; i++) {
+      const interest = balance * monthlyRate;
+      const principalPart = emi - interest;
+      balance -= principalPart;
+      const monthLabel = startDate.toLocaleString('default', { month: 'short', year: 'numeric' });
+      scheduleHTML += `
+        <tr>
+          <td>${monthLabel}</td>
+          <td>${formatINR(principalPart)}</td>
+          <td>${formatINR(interest)}</td>
+          <td>${balance > 0 ? formatINR(balance) : formatINR(0)}</td>
+        </tr>`;
+      startDate.setMonth(startDate.getMonth() + 1);
+    }
+
+    scheduleHTML += '</table>';
+    document.getElementById('schedule').innerHTML = scheduleHTML;
+  }
+
+  function resetForm() {
+    ['loanAmount', 'interestRate', 'loanTenure', 'startMonth'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('tenureType').value = 'years';
+    document.getElementById('results').innerHTML = '';
+    document.getElementById('schedule').innerHTML = '';
+    document.getElementById('amountInWords').innerText = '';
+    if (window.emiPie) window.emiPie.destroy();
+  }
+
+  function toggleDarkMode() {
+    document.body.classList.toggle('dark-mode');
+  }
+
+  function exportCSV() {
+    let rows = document.querySelectorAll("table tr");
+    let csv = [];
+    rows.forEach(row => {
+      let cols = row.querySelectorAll("td, th");
+      let rowData = Array.from(cols).map(col => col.innerText.replace(/₹/g, ''));
+      csv.push(rowData.join(","));
+    });
+
+    let blob = new Blob([csv.join("\n")], { type: "text/csv" });
+    let url = URL.createObjectURL(blob);
+    let a = document.createElement("a");
+    a.href = url;
+    a.download = "EMI_Schedule.csv";
+    a.click();
+  }
+
+  function exportPDF() {
+    const schedule = document.getElementById('schedule');
+    const opt = {
+      margin: 0.5,
+      filename: 'EMI_Schedule.pdf',
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+    };
+    html2pdf().from(schedule).set(opt).save();
+  }
+
+  function numberToWords(num) {
+    if (isNaN(num) || num === 0) return 'zero';
+    const a = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+    const b = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
+    const c = ["ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
+
+    function convertToWords(n) {
+      if (n < 10) return a[n];
+      if (n < 20) return c[n - 10];
+      if (n < 100) return b[Math.floor(n / 10)] + (n % 10 ? "-" + a[n % 10] : "");
+      if (n < 1000) return a[Math.floor(n / 100)] + " hundred " + convertToWords(n % 100);
+      if (n < 100000) return convertToWords(Math.floor(n / 1000)) + " thousand " + convertToWords(n % 1000);
+      return convertToWords(Math.floor(n / 100000)) + " lakh " + convertToWords(n % 100000);
+    }
+
+    return convertToWords(num).replace(/\s+/g, ' ').trim();
+  }
+
+  window.onload = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    document.getElementById('startMonth').value = `${year}-${month}`;
+  };
 </script>
 </body>
 </html>
