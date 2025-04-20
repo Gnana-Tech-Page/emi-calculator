@@ -6,35 +6,63 @@
   <title>EMI Calculator</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 20px;
-      background-color: var(--bg-color);
-      color: var(--text-color);
-      transition: background-color 0.3s, color 0.3s;
-    }
     :root {
       --bg-color: #ffffff;
       --text-color: #000000;
+      --card-bg: #f5f5f5;
+      --primary-color: #4caf50;
+      --danger-color: #f44336;
     }
     .dark-mode {
       --bg-color: #121212;
       --text-color: #ffffff;
+      --card-bg: #1e1e1e;
+    }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      transition: background-color 0.3s, color 0.3s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
     }
     .container {
+      background-color: var(--card-bg);
+      border-radius: 12px;
+      padding: 30px;
       max-width: 600px;
-      margin: auto;
+      width: 100%;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    }
+    h1, h2, h3 {
+      text-align: center;
     }
     label, input, select {
       display: block;
       margin: 10px 0;
       width: 100%;
     }
+    input, select {
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
     button {
-      padding: 10px;
+      padding: 10px 20px;
       margin: 10px 5px 0 0;
       cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      background-color: var(--primary-color);
+      color: white;
+      font-weight: bold;
+    }
+    button:hover {
+      opacity: 0.9;
     }
     .output {
       margin-top: 20px;
@@ -67,6 +95,9 @@
       <option value="months">Months</option>
     </select>
   </label>
+  <label>Start Month:
+    <input type="month" id="startMonth">
+  </label>
   <button onclick="calculateEMI()">Calculate EMI</button>
   <button onclick="resetForm()">Reset</button>
   <button onclick="toggleDarkMode()">Toggle Light/Dark</button>
@@ -88,6 +119,7 @@ function calculateEMI() {
   const annualRate = parseFloat(document.getElementById('interestRate').value);
   const tenureInput = parseInt(document.getElementById('loanTenure').value);
   const tenureType = document.getElementById('tenureType').value;
+  const startMonthInput = document.getElementById('startMonth').value;
 
   if (!validateInputs(amount, annualRate, tenureInput)) {
     alert("Please enter valid, non-zero numeric values.");
@@ -105,12 +137,13 @@ function calculateEMI() {
   document.getElementById('results').innerHTML = `
     <h2>Results:</h2>
     <p>Monthly EMI: ₹${emi.toFixed(2)}</p>
-    <p>Total Interest: ₹${totalInterest.toFixed(2)}</p>
+    <p>Total Principal Paid: ₹${amount.toFixed(2)}</p>
+    <p>Total Interest Paid: ₹${totalInterest.toFixed(2)}</p>
     <p>Total Payment: ₹${totalPayment.toFixed(2)}</p>
   `;
 
   renderChart(amount, totalInterest);
-  renderSchedule(emi, amount, monthlyRate, months);
+  renderSchedule(emi, amount, monthlyRate, months, startMonthInput);
 }
 
 function renderChart(principal, interest) {
@@ -128,14 +161,19 @@ function renderChart(principal, interest) {
   });
 }
 
-function renderSchedule(emi, principal, monthlyRate, months) {
+function renderSchedule(emi, principal, monthlyRate, months, startMonthInput) {
   let balance = principal;
   let scheduleHTML = '<h3>Payment Schedule</h3><table><tr><th>Month</th><th>Principal</th><th>Interest</th><th>Balance</th></tr>';
+
+  let startDate = startMonthInput ? new Date(startMonthInput + '-01') : new Date();
+
   for (let i = 1; i <= months; i++) {
     const interest = balance * monthlyRate;
     const principalPart = emi - interest;
     balance -= principalPart;
-    scheduleHTML += `<tr><td>${i}</td><td>₹${principalPart.toFixed(2)}</td><td>₹${interest.toFixed(2)}</td><td>₹${balance > 0 ? balance.toFixed(2) : 0}</td></tr>`;
+    const monthLabel = startDate.toLocaleString('default', { month: 'short', year: 'numeric' });
+    scheduleHTML += `<tr><td>${monthLabel}</td><td>₹${principalPart.toFixed(2)}</td><td>₹${interest.toFixed(2)}</td><td>₹${balance > 0 ? balance.toFixed(2) : 0}</td></tr>`;
+    startDate.setMonth(startDate.getMonth() + 1);
   }
   scheduleHTML += '</table>';
   document.getElementById('schedule').innerHTML = scheduleHTML;
@@ -146,6 +184,7 @@ function resetForm() {
   document.getElementById('interestRate').value = '';
   document.getElementById('loanTenure').value = '';
   document.getElementById('tenureType').value = 'years';
+  document.getElementById('startMonth').value = '';
   document.getElementById('results').innerHTML = '';
   document.getElementById('schedule').innerHTML = '';
   if (window.emiPie) window.emiPie.destroy();
@@ -153,6 +192,13 @@ function resetForm() {
 
 function toggleDarkMode() {
   document.body.classList.toggle('dark-mode');
+}
+
+window.onload = function() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = (today.getMonth() + 1).toString().padStart(2, '0');
+  document.getElementById('startMonth').value = `${year}-${month}`;
 }
 </script>
 </body>
